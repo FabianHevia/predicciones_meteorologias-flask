@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Predicciones Meteorológicas Chile</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.1.3/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chart.js/3.7.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f5f5f5;
+        }
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        .weather-icon {
+            font-size: 2rem;
+            margin-right: 10px;
+        }
+        .current-weather {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .data-point {
+            text-align: center;
+            padding: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <h1 class="text-center mb-4">Predicciones Meteorológicas Chile</h1>
+        
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">Seleccionar Ciudad</h5>
+                    </div>
+                    <div class="card-body">
+                        <select id="citySelect" class="form-select mb-3">
+                            <option value="Santiago">Santiago</option>
+                            <option value="Valparaiso">Valparaíso</option>
+                            <option value="Concepcion">Concepción</option>
+                            <option value="LaSErena">La Serena</option>
+                            <option value="Antofagasta">Antofagasta</option>
+                            <option value="PuntaArenas">Punta Arenas</option>
+                        </select>
+                        <div class="d-grid">
+                            <button id="loadDataBtn" class="btn btn-primary">Cargar Datos</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">Clima Actual</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="currentWeather" class="current-weather">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Cargando...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Predicción a 7 días</h5>
+                        <select id="chartTypeSelect" class="form-select form-select-sm" style="width: auto;">
+                            <option value="line">Línea</option>
+                            <option value="bar">Barras</option>
+                        </select>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="weatherChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header bg-warning">
+                        <h5 class="mb-0">Pronóstico de Precipitaciones</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="chart-container">
+                            <canvas id="precipChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">Detalles del Pronóstico</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Temperatura</th>
+                                        <th>Precipitación</th>
+                                        <th>Probabilidad</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="forecastTable">
+                                    <tr>
+                                        <td colspan="4" class="text-center">Cargando datos...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Variables para los gráficos
+        let weatherChart;
+        let precipChart;
+        
+        // Función para inicializar los gráficos
+        function initCharts() {
+            const tempCtx = document.getElementById('weatherChart').getContext('2d');
+            const precipCtx = document.getElementById('precipChart').getContext('2d');
+            
+            // Gráfico de temperatura
+            weatherChart = new Chart(tempCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Temperatura (°C)',
+                        data: [],
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        tension: 0.2,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'Temperatura (°C)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Fecha'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Gráfico de precipitaciones
+            precipChart = new Chart(precipCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Precipitación (mm)',
+                        data: [],
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Precipitación (mm)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Fecha'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Función para cargar datos del clima actual
+        async function loadCurrentWeather(city) {
+            try {
+                const response = await fetch(`/get_current_weather?ciudad=${city}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    document.getElementById('currentWeather').innerHTML = `<div class="alert alert-danger">Error: ${data.error}</div>`;
+                    return;
+                }
+                
+                // Mostrar datos actuales (simulados para el ejemplo)
+                const currentTemp = Math.round(20 + Math.random() * 10);
+                const humidity = Math.round(50 + Math.random() * 30);
+                const windSpeed = Math.round(5 + Math.random() * 15);
+                
+                document.getElementById('currentWeather').innerHTML = `
+                    <div class="row w-100">
+                        <div class="col-4 data-point">
+                            <i class="weather-icon">🌡️</i>
+                            <div>${currentTemp}°C</div>
+                            <small>Temperatura</small>
+                        </div>
+                        <div class="col-4 data-point">
+                            <i class="weather-icon">💧</i>
+                            <div>${humidity}%</div>
+                            <small>Humedad</small>
+                        </div>
+                        <div class="col-4 data-point">
+                            <i class="weather-icon">💨</i>
+                            <div>${windSpeed} km/h</div>
+                            <small>Viento</small>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading current weather:', error);
+                document.getElementById('currentWeather').innerHTML = `<div class="alert alert-danger">Error al cargar datos</div>`;
+            }
+        }
+        
+        // Función para cargar predicciones
+        async function loadPredictions(city) {
+            try {
+                const response = await fetch(`/predict_weather?ciudad=${city}&days=7`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.error('Error from API:', data.error);
+                    return;
+                }
+                
+                // Preparar datos para los gráficos
+                const labels = data.map(day => moment(day.date).format('DD/MM'));
+                const temps = data.map(day => day.temp);
+                const precips = data.map(day => day.precip);
+                
+                // Actualizar gráficos
+                weatherChart.data.labels = labels;
+                weatherChart.data.datasets[0].data = temps;
+                weatherChart.update();
+                
+                precipChart.data.labels = labels;
+                precipChart.data.datasets[0].data = precips;
+                precipChart.update();
+                
+                // Actualizar tabla
+                let tableHtml = '';
+                data.forEach(day => {
+                    const precipProbability = day.precip > 1 ? Math.min(100, Math.round(day.precip * 5)) : Math.round(day.precip * 10);
+                    tableHtml += `
+                        <tr>
+                            <td>${moment(day.date).format('DD/MM/YYYY')}</td>
+                            <td>${day.temp.toFixed(1)}°C</td>
+                            <td>${day.precip.toFixed(1)} mm</td>
+                            <td>${precipProbability}%</td>
+                        </tr>
+                    `;
+                });
+                document.getElementById('forecastTable').innerHTML = tableHtml;
+                
+            } catch (error) {
+                console.error('Error loading predictions:', error);
+            }
+        }
+        
+        // Evento para cambiar tipo de gráfico
+        document.getElementById('chartTypeSelect').addEventListener('change', function() {
+            const chartType = this.value;
+            weatherChart.config.type = chartType;
+            weatherChart.update();
+        });
+        
+        // Evento para cargar datos
+        document.getElementById('loadDataBtn').addEventListener('click', function() {
+            const city = document.getElementById('citySelect').value;
+            loadCurrentWeather(city);
+            loadPredictions(city);
+        });
+        
+        // Inicializar al cargar la página
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            loadCurrentWeather('Santiago');
+            loadPredictions('Santiago');
+        });
+    </script>
+</body>
+</html>
